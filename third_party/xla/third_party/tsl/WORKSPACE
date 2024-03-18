@@ -50,3 +50,17 @@ tsl_workspace1()
 load(":workspace0.bzl", "tsl_workspace0")
 
 tsl_workspace0()
+
+load(
+    "//third_party/gpus/cuda:hermetic_cuda_init_redist_json_repository.bzl",
+    "hermetic_cuda_redist_json_workspace",
+)
+
+hermetic_cuda_redist_json_workspace()
+
+load(
+    "//third_party/gpus/cuda:hermetic_cuda_init_repositories.bzl",
+    "hermetic_cuda_workspace",
+)
+
+hermetic_cuda_workspace()
