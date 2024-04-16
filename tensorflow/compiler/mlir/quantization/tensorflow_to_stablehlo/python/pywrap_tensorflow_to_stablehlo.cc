@@ -13,6 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#include <filesystem>  // NOLINT
+
 #include "absl/strings/str_format.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "mlir/IR/OwningOpRef.h"  // from @llvm-project
@@ -26,7 +28,6 @@ limitations under the License.
 #include "tensorflow/compiler/mlir/quantization/tensorflow/python/type_casters.h"  // IWYU pragma: keep
 #include "tensorflow/compiler/mlir/quantization/tensorflow_to_stablehlo/tf_to_stablehlo.h"
 #include "tensorflow/compiler/mlir/tensorflow/dialect_registration.h"
-
 namespace py = pybind11;
 
 namespace mlir::pywrap {
