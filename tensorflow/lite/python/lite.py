@@ -672,6 +672,7 @@ class TFLiteConverterBase:
     self._experimental_qdq_conversion_mode = None
     self._experimental_disable_per_channel_quantization_for_dense_layers = False
     self._experimental_enable_composite_direct_lowering = False
+    self._canonicalizing_inf_as_min_max_float = False
 
     # Debug parameters
     self.ir_dump_dir = None
@@ -831,6 +832,9 @@ class TFLiteConverterBase:
         ),
         "enable_composite_direct_lowering": (
             self._experimental_enable_composite_direct_lowering
+        ),
+        "canonicalizing_inf_as_min_max_float ": (
+            self._canonicalizing_inf_as_min_max_float
         ),
     }
 
