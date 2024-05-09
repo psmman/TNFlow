@@ -62,6 +62,10 @@ Status MaybeMoveContiguousSlices(Tensor& src, int64_t src_offset,
                                  Tensor* dst);
 }  // namespace batch_util
 
+namespace tfrt_tpu {
+bool CanDonateTensor(const Tensor* tensor, int additional_refs);
+}  // namespace tfrt_tpu
+
 /// @ingroup core
 
 /// Interface to access the raw ref-counted data buffer.
@@ -276,7 +280,7 @@ class Tensor {
 
   // I/O operators.
   friend std::ostream&  // NOLINT: iosfwd
-  operator<<(std::ostream& out, const Tensor& tensor);
+  operator<<(std::ostream & out, const Tensor & tensor);
 
   /// Returns the data type.
   DataType dtype() const { return shape_.data_type(); }
@@ -705,6 +709,8 @@ class Tensor {
   friend class CastOpBase;            // For access to set_dtype.
   friend class ScopedAllocator;       // For access to buf_.
   friend class PjRtTensorBufferUtil;  // For access to buf_.
+  friend bool tensorflow::tfrt_tpu::CanDonateTensor(
+      const Tensor* tensor, int additional_refs);  // For access to buf_.
   friend Status batch_util::CopyElementToSlice(
       Tensor element, Tensor* parent,
       int64_t index);  // For access to base<T>().
