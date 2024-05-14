@@ -81,6 +81,7 @@ cc_library(
         "@local_tsl//tsl/platform:status",
         "@local_xla//xla/pjrt:pjrt_compiler",
         "@local_xla//xla/pjrt:pjrt_executable",
+        "@local_xla//xla/pjrt/gpu:gpu_topology",
         "@local_xla//xla/pjrt/gpu:se_gpu_pjrt_client",
         "@local_xla//xla/pjrt/gpu:se_gpu_pjrt_compiler",
         "@local_xla//xla/service:compiler",

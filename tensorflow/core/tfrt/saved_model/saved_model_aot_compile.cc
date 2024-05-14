@@ -45,6 +45,7 @@ limitations under the License.
 #include "tensorflow/compiler/mlir/tfrt/translate/import_model.h"
 #include "tensorflow/compiler/mlir/tfrt/translate/tfrt_compile_options.h"
 #include "tensorflow/compiler/tf2xla/xla_compiler.h"
+#include "xla/pjrt/gpu/gpu_topology.h"
 #include "xla/pjrt/gpu/se_gpu_pjrt_client.h"
 #include "xla/pjrt/gpu/se_gpu_pjrt_compiler.h"
 #include "xla/pjrt/pjrt_compiler.h"
@@ -310,8 +311,8 @@ AotCompileToGpuPjRtExecutable(
   xla::Compiler::TargetConfig gpu_config(gpu_target_config);
   xla::StreamExecutorGpuCompiler pjrt_gpu_compiler;
   // Create a trivial topology, which won't be used.
-  xla::StreamExecutorGpuTopologyDescription topology(
-      xla::CudaId(), xla::CudaName(), "fake_device", {0});
+  xla::StreamExecutorGpuTopologyDescription topology(xla::CudaId(),
+                                                     xla::CudaName(), nullptr);
   xla::CompileOptions pjrt_options =
       GetPjRtCompileOptions(options, **compilation_result);
   pjrt_options.target_config = gpu_config;
