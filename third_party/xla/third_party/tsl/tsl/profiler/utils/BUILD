@@ -490,3 +490,63 @@ tsl_cc_test(
         "//tsl/platform:test_main",
     ],
 )
+
+cc_library(
+    name = "no_init",
+    hdrs = ["no_init.h"],
+    deps = [
+    ],
+)
+
+cc_library(
+    name = "lock_free_queue",
+    hdrs = ["lock_free_queue.h"],
+    deps = [
+        ":no_init",
+        "//tsl/platform:logging",
+        "//tsl/platform:macros",
+        "@com_google_absl//absl/log:check",
+    ],
+)
+
+tsl_cc_test(
+    name = "lock_free_queue_test",
+    size = "small",
+    timeout = "short",
+    srcs = ["lock_free_queue_test.cc"],
+    deps = [
+        ":lock_free_queue",
+        "//tsl/platform:env",
+        "//tsl/platform:env_impl",
+        "//tsl/platform:test",
+        "//tsl/platform:test_main",
+        "@com_google_absl//absl/synchronization",
+    ],
+)
+
+cc_library(
+    name = "per_thread",
+    hdrs = ["per_thread.h"],
+    deps = [
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/synchronization",
+    ],
+)
+
+tsl_cc_test(
+    name = "per_thread_test",
+    size = "small",
+    timeout = "short",
+    srcs = ["per_thread_test.cc"],
+    deps = [
+        ":per_thread",
+        "//tsl/platform:env",
+        "//tsl/platform:env_impl",
+        "//tsl/platform:test",
+        "//tsl/platform:test_main",
+        "@com_google_absl//absl/cleanup",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/synchronization",
+    ],
+)
