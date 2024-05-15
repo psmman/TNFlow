@@ -6054,6 +6054,7 @@ cc_library(
     deps = [
         ":hlo_alias_analysis",
         ":hlo_buffer",
+        ":hlo_cse",
         ":hlo_pass",
         ":hlo_value",
         ":host_memory_offload_annotations_hdr",
