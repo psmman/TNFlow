@@ -112,7 +112,7 @@ absl::Status LocalExecutable::ValidateExecutionOptions(
         backend.platform()->Name());
   }
 
-  return OkStatus();
+  return absl::OkStatus();
 }
 
 absl::StatusOr<std::pair<ServiceExecutableRunOptions, StreamPool::Ptr>>
