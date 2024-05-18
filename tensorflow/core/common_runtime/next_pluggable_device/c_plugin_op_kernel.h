@@ -82,9 +82,9 @@ class CPluginOpKernelContext : public PluginOpKernelContext {
 
   int NumInputs() const override { return TF_NumInputs(ctx_); }
 
-  Status GetInput(int index, Tensor* tensor) const override;
+  absl::Status GetInput(int index, const Tensor** tensor) const override;
 
-  Status GetInput(const char* name, const Tensor** tensor) override;
+  absl::Status GetInput(const char* name, const Tensor** tensor) const override;
 
   Status GetInputRange(std::string_view name,
                        std::pair<int, int>* range) const override;
@@ -156,7 +156,7 @@ class CPluginOpKernelContext : public PluginOpKernelContext {
 
   // A cache for tensors obtained from the ctx_. This is needed to extend the
   // lifetime of the c++ tensorflow::Tensor created from `TF_TensorToTensor`.
-  std::vector<Tensor> obtained_tensors_ TF_GUARDED_BY(mu_);
+  mutable std::vector<Tensor> obtained_tensors_ TF_GUARDED_BY(mu_);
   TF_OpKernelContext* ctx_;  // not owned.
 };
 
