@@ -17,6 +17,7 @@ limitations under the License.
 #define TENSORFLOW_CORE_TFRT_IFRT_IFRT_MODEL_CONTEXT_H_
 
 #include <memory>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -30,6 +31,7 @@ limitations under the License.
 #include "tensorflow/core/tfrt/ifrt/ifrt_loaded_variable_registry.h"
 #include "tensorflow/core/tfrt/ifrt/ifrt_restore_tensor_registry.h"
 #include "tensorflow/core/tfrt/ifrt/ifrt_serving_core_selector.h"
+#include "tsl/platform/protobuf.h"
 #include "tsl/platform/threadpool.h"
 #include "tfrt/host_context/concurrent_work_queue.h"  // from @tf_runtime
 
@@ -50,23 +52,28 @@ struct DeviceConfig {
 // This class is thread compatible.
 class IfrtModelContext {
  public:
-  explicit IfrtModelContext(std::shared_ptr<xla::ifrt::Client> client,
-                            IfrtServingCoreSelector* ifrt_serving_core_selector,
-                            const tsl::thread::ThreadPool* thread_pool)
+  explicit IfrtModelContext(
+      std::shared_ptr<xla::ifrt::Client> client,
+      IfrtServingCoreSelector* ifrt_serving_core_selector,
+      const tsl::thread::ThreadPool* thread_pool,
+      std::optional<std::unique_ptr<tsl::protobuf::Message>> comp_env_proto)
       : client_(std::move(client)),
         ifrt_serving_core_selector_(ifrt_serving_core_selector),
-        thread_pool_(*thread_pool) {}
+        thread_pool_(*thread_pool),
+        compilation_environment_proto_(std::move(comp_env_proto)) {}
   IfrtModelContext(
       std::shared_ptr<xla::ifrt::Client> client,
       IfrtServingCoreSelector* ifrt_serving_core_selector,
       const tsl::thread::ThreadPool* thread_pool,
       tensorflow::DeviceMgr* device_mgr,
-      tensorflow::XlaHelpers::ShapeRepresentationFn shape_representation_fn)
+      tensorflow::XlaHelpers::ShapeRepresentationFn shape_representation_fn,
+      std::optional<std::unique_ptr<tsl::protobuf::Message>> comp_env_proto)
       : client_(std::move(client)),
         ifrt_serving_core_selector_(ifrt_serving_core_selector),
         thread_pool_(*thread_pool),
         device_mgr_(device_mgr),
-        shape_representation_fn_(shape_representation_fn) {}
+        shape_representation_fn_(shape_representation_fn),
+        compilation_environment_proto_(std::move(comp_env_proto)) {}
 
   void RegisterHandle(ServingExecutableRegistry::Handle handle) {
     handles_.push_back(std::move(handle));
@@ -107,6 +114,12 @@ class IfrtModelContext {
     checkpoint_loader_queue_ = work_queue;
   }
 
+  tsl::protobuf::Message* GetCompilationEnvironmentProto() const {
+    return compilation_environment_proto_.has_value()
+               ? (*compilation_environment_proto_).get()
+               : nullptr;
+  }
+
   // Freeze the model: release the resources such as host tensors that are used
   // by the device only. The caller guarantees all resources released in this
   // function is no longer in use in regular execution path.
@@ -123,6 +136,8 @@ class IfrtModelContext {
   tensorflow::DeviceMgr* device_mgr_ = nullptr;  // Not owned.
   tensorflow::XlaHelpers::ShapeRepresentationFn shape_representation_fn_ =
       tensorflow::IdentityShapeRepresentationFn();
+  std::optional<std::unique_ptr<tsl::protobuf::Message>>
+      compilation_environment_proto_;
 
   // Dedicated work queue for heavy task such as variable tensor restoration.
   tfrt::ConcurrentWorkQueue* checkpoint_loader_queue_ = nullptr;

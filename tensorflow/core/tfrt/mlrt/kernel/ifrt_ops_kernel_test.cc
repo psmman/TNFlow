@@ -359,7 +359,7 @@ class KernelTest : public ::testing::Test {
     resource_context_
         .CreateResource<tensorflow::ifrt_serving::IfrtModelContext>(
             "IfrtModelContext", client_, ifrt_core_selector_.get(),
-            &GetThreadPool());
+            &GetThreadPool(), std::nullopt);
 
     tf_context_ = std::make_unique<Context>(fallback_request_state_.get(),
                                             &resource_context_);
