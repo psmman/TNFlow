@@ -117,8 +117,9 @@ struct TorchIndexSelectIsGather : public OpRewritePattern<TorchIndexSelectOp> {
     }
 
     auto gatherDimensionNumbersAttr = GatherDimensionNumbersAttr::get(
-        rewriter.getContext(), offsetDims, collapsedSliceDims, startIndexMap,
-        indexVectorDim);
+        rewriter.getContext(), offsetDims, collapsedSliceDims,
+        /*operandBatchingDims=*/{}, /*startIndicesBatchingDims=*/{},
+        startIndexMap, indexVectorDim);
 
     auto sliceSizesAttr = rewriter.getI64TensorAttr(sliceSizes);
 

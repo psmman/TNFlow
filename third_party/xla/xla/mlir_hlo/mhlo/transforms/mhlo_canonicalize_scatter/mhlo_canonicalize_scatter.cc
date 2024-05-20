@@ -212,6 +212,8 @@ struct CanonicalizeScatterPattern : public OpRewritePattern<ScatterOp> {
         /*updateWindowDims=*/
         llvm::to_vector<4>(llvm::seq<int64_t>(1, operandRank + 1)),
         /*insertedWindowDims=*/std::nullopt,
+        /*inputBatchingDims=*/std::nullopt,
+        /*scatterIndicesBatchingDims=*/std::nullopt,
         /*scatterDimsToOperandDims=*/
         llvm::to_vector<4>(llvm::seq<int64_t>(0, scatterIndicesVectorSize)),
         /*indexVectorDim=*/1);

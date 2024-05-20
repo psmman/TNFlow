@@ -154,7 +154,9 @@ struct CanonicalizeGatherPattern : public OpRewritePattern<GatherOp> {
 
     auto newDims = GatherDimensionNumbersAttr::get(
         rewriter.getContext(), offsetDims,
-        /*collapsedSliceDims=*/{}, startIndexMap,
+        /*collapsedSliceDims=*/{},
+        /*operandBatchingDims=*/{},
+        /*startIndicesBatchingDims=*/{}, startIndexMap,
         /*indexVectorDim=*/1);
     TypedValue<RankedTensorType> result =
         b.create<GatherOp>(operand, startIndices, newDims,

@@ -178,6 +178,8 @@ struct SelectAndScatterExpanderPattern
         sas->getContext(),
         /*updateWindowDims=*/{},
         /*insertedWindowDims=*/scatterDims,
+        /*inputBatchingDims=*/{},
+        /*scatterIndicesBatchingDims=*/{},
         /*scatterDimsToOperandDims=*/scatterDims,
         /*indexVectorDim=*/source.getType().getRank());
     auto scatterOp = builder.create<mhlo::ScatterOp>(

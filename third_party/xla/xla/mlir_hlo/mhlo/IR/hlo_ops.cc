@@ -1207,6 +1207,8 @@ LogicalResult GatherOp::inferReturnTypeComponents(
       location, adaptor.getOperand(), adaptor.getStartIndices(),
       adaptor.getDimensionNumbers().getOffsetDims(),
       adaptor.getDimensionNumbers().getCollapsedSliceDims(),
+      adaptor.getDimensionNumbers().getOperandBatchingDims(),
+      adaptor.getDimensionNumbers().getStartIndicesBatchingDims(),
       adaptor.getDimensionNumbers().getStartIndexMap(),
       adaptor.getDimensionNumbers().getIndexVectorDim(),
       llvm::to_vector(adaptor.getSliceSizes().getValues<int64_t>()),
@@ -1266,6 +1268,8 @@ LogicalResult DynamicGatherOp::inferReturnTypeComponents(
       location, adaptor.getOperand(), adaptor.getStartIndices(),
       adaptor.getSliceSizes(), adaptor.getDimensionNumbers().getOffsetDims(),
       adaptor.getDimensionNumbers().getCollapsedSliceDims(),
+      adaptor.getDimensionNumbers().getOperandBatchingDims(),
+      adaptor.getDimensionNumbers().getStartIndicesBatchingDims(),
       adaptor.getDimensionNumbers().getStartIndexMap(),
       adaptor.getDimensionNumbers().getIndexVectorDim(), inferredReturnShapes);
 }
@@ -5754,6 +5758,8 @@ LogicalResult ScatterOp::verify() {
       getLoc(), getInputs(), getScatterIndices(), getUpdates(),
       getScatterDimensionNumbers().getUpdateWindowDims(),
       getScatterDimensionNumbers().getInsertedWindowDims(),
+      getScatterDimensionNumbers().getInputBatchingDims(),
+      getScatterDimensionNumbers().getScatterIndicesBatchingDims(),
       getScatterDimensionNumbers().getScatterDimsToOperandDims(),
       getScatterDimensionNumbers().getIndexVectorDim(), getUpdateComputation());
 }
@@ -6329,6 +6335,9 @@ void ScatterDimensionNumbersAttr::print(AsmPrinter& printer) const {
   printStruct(printer, "scatter",
               std::make_pair("update_window_dims", getUpdateWindowDims()),
               std::make_pair("inserted_window_dims", getInsertedWindowDims()),
+              std::make_pair("input_batching_dims", getInputBatchingDims()),
+              std::make_pair("scatter_indices_batching_dims",
+                             getScatterIndicesBatchingDims()),
               std::make_pair("scatter_dims_to_operand_dims",
                              getScatterDimsToOperandDims()),
               std::make_pair("index_vector_dim", getIndexVectorDim()));
@@ -6337,15 +6346,20 @@ Attribute ScatterDimensionNumbersAttr::parse(AsmParser& parser, Type type) {
   if (failed(parser.parseLess())) return {};
   SmallVector<int64_t> updateWindowDims;
   SmallVector<int64_t> insertedWindowDims;
+  SmallVector<int64_t> inputBatchingDims;
+  SmallVector<int64_t> scatterIndicesBatchingDims;
   SmallVector<int64_t> scatterDimsToOperandDims;
   int64_t indexVectorDim = 0;
 
   if (failed(parseStruct(
           parser,
-          {"update_window_dims", "inserted_window_dims",
-           "scatter_dims_to_operand_dims", "index_vector_dim"},
+          {"update_window_dims", "inserted_window_dims", "input_batching_dims",
+           "scatter_indices_batching_dims", "scatter_dims_to_operand_dims",
+           "index_vector_dim"},
           {[&]() { return parseDims(parser, updateWindowDims); },
            [&]() { return parseDims(parser, insertedWindowDims); },
+           [&]() { return parseDims(parser, inputBatchingDims); },
+           [&]() { return parseDims(parser, scatterIndicesBatchingDims); },
            [&]() { return parseDims(parser, scatterDimsToOperandDims); },
            [&]() { return parser.parseInteger(indexVectorDim); }}))) {
     parser.emitError(parser.getCurrentLocation())
@@ -6355,13 +6369,17 @@ Attribute ScatterDimensionNumbersAttr::parse(AsmParser& parser, Type type) {
 
   return ScatterDimensionNumbersAttr::get(
       parser.getContext(), updateWindowDims, insertedWindowDims,
-      scatterDimsToOperandDims, indexVectorDim);
+      inputBatchingDims, scatterIndicesBatchingDims, scatterDimsToOperandDims,
+      indexVectorDim);
 }
 
 // Custom printer and parser for GatherDimensionNumbersAttr.
 void GatherDimensionNumbersAttr::print(AsmPrinter& printer) const {
   printStruct(printer, "gather", std::make_pair("offset_dims", getOffsetDims()),
               std::make_pair("collapsed_slice_dims", getCollapsedSliceDims()),
+              std::make_pair("operand_batching_dims", getOperandBatchingDims()),
+              std::make_pair("start_indices_batching_dims",
+                             getStartIndicesBatchingDims()),
               std::make_pair("start_index_map", getStartIndexMap()),
               std::make_pair("index_vector_dim", getIndexVectorDim()));
 }
@@ -6371,15 +6389,20 @@ Attribute GatherDimensionNumbersAttr::parse(AsmParser& parser, Type type) {
 
   SmallVector<int64_t> offsetDims;
   SmallVector<int64_t> collapsedSliceDims;
+  SmallVector<int64_t> operandBatchingDims;
+  SmallVector<int64_t> startIndicesBatchingDims;
   SmallVector<int64_t> startIndexMap;
   int64_t indexVectorDim = 0;
 
   if (failed(parseStruct(
           parser,
-          {"offset_dims", "collapsed_slice_dims", "start_index_map",
+          {"offset_dims", "collapsed_slice_dims", "operand_batching_dims",
+           "start_indices_batching_dims", "start_index_map",
            "index_vector_dim"},
           {[&]() { return parseDims(parser, offsetDims); },
            [&]() { return parseDims(parser, collapsedSliceDims); },
+           [&]() { return parseDims(parser, operandBatchingDims); },
+           [&]() { return parseDims(parser, startIndicesBatchingDims); },
            [&]() { return parseDims(parser, startIndexMap); },
            [&]() { return parser.parseInteger(indexVectorDim); }}))) {
     parser.emitError(parser.getCurrentLocation())
@@ -6387,9 +6410,9 @@ Attribute GatherDimensionNumbersAttr::parse(AsmParser& parser, Type type) {
     return {};
   }
 
-  return GatherDimensionNumbersAttr::get(parser.getContext(), offsetDims,
-                                         collapsedSliceDims, startIndexMap,
-                                         indexVectorDim);
+  return GatherDimensionNumbersAttr::get(
+      parser.getContext(), offsetDims, collapsedSliceDims, operandBatchingDims,
+      startIndicesBatchingDims, startIndexMap, indexVectorDim);
 }
 
 // Custom printer and parser for DotDimensionNumbersAttr.
