@@ -112,7 +112,7 @@ bool IsAtan2(const NodeDef& node) { return node.op() == "Atan2"; }
 bool IsBetainc(const NodeDef& node) { return node.op() == "Betainc"; }
 
 bool IsBiasAdd(const NodeDef& node) {
-  return node.op() == "BiasAdd" || node.op() == "BiasAddV1";
+  return node.op() == "BiasAdd" || node.op() == "BiasAddV1" || IsAdd(node);
 }
 
 bool IsBiasAddV2(const NodeDef& node) { return node.op() == "BiasAdd"; }

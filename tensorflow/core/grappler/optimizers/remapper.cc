@@ -25,7 +25,12 @@ limitations under the License.
 #include <vector>
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/log/log.h"
+#include "tensorflow/core/framework/numeric_types.h"
+#include "tensorflow/core/framework/tensor.h"
+#include "tensorflow/core/framework/tensor.pb.h"
 #include "tensorflow/core/framework/tensor_shape.h"
+#include "tensorflow/core/framework/types.h"
 #include "tensorflow/core/framework/versions.pb.h"
 #include "tensorflow/core/grappler/costs/graph_properties.h"
 #include "tensorflow/core/grappler/graph_view.h"
@@ -38,6 +43,7 @@ limitations under the License.
 #include "tensorflow/core/grappler/utils/symbolic_shapes.h"
 #include "tensorflow/core/grappler/utils/topological_sort.h"
 #include "tensorflow/core/lib/core/errors.h"
+#include "tensorflow/core/platform/bfloat16.h"
 #include "tensorflow/core/platform/logging.h"
 #include "tensorflow/core/protobuf/rewriter_config.pb.h"
 #include "tensorflow/core/util/env_var.h"
@@ -510,6 +516,82 @@ bool RuntimeFusionEnabled(const Cluster* cluster) {
   return is_enabled;
 }
 
+template <typename T>
+bool AllValuesAre(const TensorProto& proto, const T& value) {
+  Tensor tensor;
+  if (!tensor.FromProto(proto)) {
+    return false;
+  }
+  auto values = tensor.flat<T>();
+  for (int i = 0; i < tensor.NumElements(); ++i) {
+    if (values(i) != value) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool IsZeroTensor(const TensorProto& proto) {
+  switch (proto.dtype()) {
+    case DT_BOOL:
+      return AllValuesAre<bool>(proto, false);
+    case DT_HALF:
+      return AllValuesAre<Eigen::half>(proto, Eigen::half(0));
+    case DT_FLOAT:
+      return AllValuesAre<float>(proto, 0.0);
+    case DT_DOUBLE:
+      return AllValuesAre<double>(proto, 0.0);
+    case DT_BFLOAT16:
+      return AllValuesAre<bfloat16>(proto, bfloat16(0));
+    case DT_COMPLEX64:
+      return AllValuesAre<complex64>(proto, 0.0);
+    case DT_COMPLEX128:
+      return AllValuesAre<complex128>(proto, 0.0);
+    case DT_UINT8:
+      return AllValuesAre<uint8_t>(proto, 0);
+    case DT_INT8:
+      return AllValuesAre<int8_t>(proto, 0);
+    case DT_UINT16:
+      return AllValuesAre<uint16_t>(proto, 0);
+    case DT_INT16:
+      return AllValuesAre<int16_t>(proto, 0);
+    case DT_INT32:
+      return AllValuesAre<int32_t>(proto, 0);
+    case DT_INT64:
+      return AllValuesAre<int64_t>(proto, 0);
+    case DT_QINT32:
+      return AllValuesAre<qint32>(proto, 0);
+    case DT_QINT16:
+      return AllValuesAre<qint16>(proto, 0);
+    case DT_QUINT16:
+      return AllValuesAre<quint16>(proto, 0);
+    case DT_QINT8:
+      return AllValuesAre<qint8>(proto, 0);
+    case DT_QUINT8:
+      return AllValuesAre<quint8>(proto, 0);
+    default:
+      VLOG(1) << "Unsupported type " << DataTypeString(proto.dtype());
+  }
+  return false;
+}
+
+bool IsReluEquivalentMaiximum(const utils::MutableNodeView& node_view) {
+  if (!IsMaximum(*node_view.node())) return false;
+  const std::vector<utils::MutableFanoutView>& fanin_nodes =
+      node_view.GetRegularFanins();
+  if (fanin_nodes.size() != 2) return false;
+  bool is_relu_equivalent = false;
+  for (const auto& fanin_node : fanin_nodes) {
+    const NodeDef* node = fanin_node.node_view()->node();
+    if (!IsConstant(*node)) continue;
+    if (IsZeroTensor(node->attr().at("value").tensor())) {
+      is_relu_equivalent = true;
+      break;
+    }
+  }
+  return is_relu_equivalent;
+}
+
 bool IsSupportedActivation(const NodeDef& node, const Cluster* cluster) {
   bool is_default_supported =
       IsRelu(node) || IsRelu6(node) || IsElu(node) || IsLeakyRelu(node);
@@ -865,7 +947,9 @@ bool FindContractionWithBiasAndActivation(
   if (HasControlFaninOrFanout(*node_view)) return false;
 
   const auto* node_def = node_view->node();
-  if (!IsSupportedActivation(*node_def, cluster)) return false;
+  if (!IsSupportedActivation(*node_def, cluster) &&
+      !(IsReluEquivalentMaiximum(*node_view)))
+    return false;
 
   // And input to the activation node must match ContractionWithBiasAdd pattern.
   if (node_view->NumRegularFanins() < 1) return false;
@@ -3270,9 +3354,6 @@ Status AddFusedContractionNode(RemapperContext* ctx,
   const GraphDef* graph = ctx->graph_view.graph();
   const NodeDef& contraction = graph->node(matched.contraction);
   const NodeDef& bias_add = graph->node(matched.bias_add);
-  VLOG(2) << "Fuse " << contraction.op()
-          << " with BiasAdd: " << " bias_add=" << bias_add.name()
-          << " contraction=" << contraction.name();
 
   NodeDef fused_op;
   fused_op.set_name(bias_add.name());
@@ -3401,7 +3482,11 @@ Status AddFusedContractionNode(
     CopyConv3DAttributes(contraction, &fused_op, &activation);
   }
 
-  SetFusedOpAttributes(&fused_op, {"BiasAdd", activation.op()});
+  SetFusedOpAttributes(
+      &fused_op, {"BiasAdd", IsReluEquivalentMaiximum(
+                                 *ctx->graph_view.GetNode(matched.activation))
+                                 ? "Relu"
+                                 : activation.op()});
 
   utils::Mutation* mutation = ctx->graph_view.GetMutationBuilder();
   Status status;
@@ -4840,6 +4925,7 @@ Status Remapper::Optimize(Cluster* cluster, const GrapplerItem& item,
 #ifdef DNNL_AARCH64_USE_ACL
   xla_cpu_jit_disable_fusion = false;
 #endif  // DNNL_AARCH64_USE_ACL
+
   RemapperContext ctx(&mutable_item, &status, cpu_layout_conversion_,
                       xla_auto_clustering_on_, xla_cpu_jit_disable_fusion);
   TF_RETURN_IF_ERROR(status);
