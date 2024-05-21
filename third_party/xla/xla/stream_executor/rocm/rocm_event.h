@@ -1,4 +1,4 @@
-/* Copyright 2024 The OpenXLA Authors.
+/* Copyright 2018 The OpenXLA Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,22 +13,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#ifndef XLA_STREAM_EXECUTOR_EVENT_INTERFACE_H_
-#define XLA_STREAM_EXECUTOR_EVENT_INTERFACE_H_
+#ifndef XLA_STREAM_EXECUTOR_ROCM_ROCM_EVENT_H_
+#define XLA_STREAM_EXECUTOR_ROCM_ROCM_EVENT_H_
 
-namespace stream_executor {
+#include "xla/stream_executor/gpu/gpu_event.h"
+#include "xla/stream_executor/gpu/gpu_executor.h"
 
-// Base class for all kinds of Events supported by StreamExecutors.
-class EventInterface {
+namespace stream_executor::gpu {
+
+// This class implements Event::PollForStatus for ROCm devices.
+class RocmEvent : public GpuEvent {
  public:
-  EventInterface() = default;
-  virtual ~EventInterface() = default;
+  explicit RocmEvent(GpuExecutor *executor) : GpuEvent(executor) {}
 
- private:
-  EventInterface(const EventInterface&) = delete;
-  void operator=(const EventInterface&) = delete;
+  Event::Status PollForStatus() override;
 };
+}  // namespace stream_executor::gpu
 
-}  // namespace stream_executor
-
-#endif  // XLA_STREAM_EXECUTOR_EVENT_INTERFACE_H_
+#endif  // XLA_STREAM_EXECUTOR_ROCM_ROCM_EVENT_H_
