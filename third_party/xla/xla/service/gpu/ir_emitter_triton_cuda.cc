@@ -74,10 +74,12 @@ absl::Status CreateTritonPipeline(
   pm.addPass(mt::gpu::createRemoveLayoutConversionsPass());
   pm.addPass(mt::gpu::createOptimizeDotOperandsPass(ccCuda.IsAtLeastAmpere()));
   pm.addPass(mlir::createCSEPass());
-
-  pm.addPass(mt::gpu::createPipelinePass(config.num_stages, config.num_warps,
-                                         config.num_ctas, ccAsInt));
-
+  // todo explain
+  if (ccCuda.IsAtLeastAmpere()) {
+    pm.addPass(mt::gpu::createCombineTensorSelectAndIfPass());
+    pm.addPass(mt::gpu::createPipelinePass(config.num_stages, config.num_warps,
+                                           config.num_ctas, ccAsInt));
+  }
   if (!ccCuda.IsAtLeastHopper()) {
     pm.addPass(mt::gpu::createPrefetchPass());
   }
