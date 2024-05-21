@@ -103,8 +103,9 @@ class UpdateExecutor<T, Input, Update, Output, scatter_nd_op::UpdateOp::MAX> {
 namespace functor {
 
 // Implementation of update functor for CPU.
-template <typename T, typename Index, scatter_nd_op::UpdateOp OP, int IXDIM>
-struct ScatterNdFunctor<CPUDevice, T, Index, OP, IXDIM> {
+template <typename T, typename Index, scatter_nd_op::UpdateOp OP, int IXDIM,
+          bool DROP_BAD_INDICES>
+struct ScatterNdFunctor<CPUDevice, T, Index, OP, IXDIM, DROP_BAD_INDICES> {
   Index operator()(
       const CPUDevice& d, const Index slice_size,
       const Eigen::array<Eigen::DenseIndex, IXDIM> output_shape_prefix,
@@ -135,34 +136,44 @@ struct ScatterNdFunctor<CPUDevice, T, Index, OP, IXDIM> {
         out_of_bounds |= !FastBoundsCheck(ix_d, output_shape_prefix[dim]);
         i += ix_d * batch_strides[dim];
       }
-      if (TF_PREDICT_FALSE(out_of_bounds)) {
-        error_loc = loc;
-        break;
-      } else {
-        auto input_chip = Toutput.template chip<0>(i);
-        auto output_chip = input_chip;
-        auto update_chip = Tupdates.template chip<0>(loc);
-        update_executor::UpdateExecutor<
-            CPUDevice, decltype(input_chip), decltype(update_chip),
-            decltype(output_chip), OP>::Execute(d, input_chip, update_chip,
-                                                output_chip);
+      if constexpr (!DROP_BAD_INDICES) {
+        if (TF_PREDICT_FALSE(out_of_bounds)) {
+          error_loc = loc;
+          break;
+        }
       }
+      auto input_chip = Toutput.template chip<0>(i);
+      auto output_chip = input_chip;
+      auto update_chip = Tupdates.template chip<0>(loc);
+      update_executor::UpdateExecutor<
+          CPUDevice, decltype(input_chip), decltype(update_chip),
+          decltype(output_chip), OP>::Execute(d, input_chip, update_chip,
+                                              output_chip);
     }
 
     return error_loc;
   }
 };
 
-#define REGISTER_SCATTER_ND_FULL(T, Index, op)                               \
-  template Index                                                             \
-  ScatterNdFunctor<CPUDevice, T, Index, op, CPU_PROVIDED_IXDIM>::operator()( \
-      const CPUDevice& d, const Index slice_size,                            \
-      const Eigen::array<Eigen::DenseIndex, CPU_PROVIDED_IXDIM>              \
-          output_shape_prefix,                                               \
-      typename TTypes<T, 2>::Tensor Tparams,                                 \
-      typename TTypes<Index, 2>::ConstTensor Tindices,                       \
-      typename TTypes<T, 2>::ConstTensor Tupdates,                           \
-      typename TTypes<T, 2>::Tensor Toutput)
+#define REGISTER_SCATTER_ND_FULL(T, Index, op)                                 \
+  template Index ScatterNdFunctor<CPUDevice, T, Index, op, CPU_PROVIDED_IXDIM, \
+                                  /*DROP_BAD_INDICES=*/false>::                \
+  operator()(const CPUDevice& d, const Index slice_size,                       \
+             const Eigen::array<Eigen::DenseIndex, CPU_PROVIDED_IXDIM>         \
+                 output_shape_prefix,                                          \
+             typename TTypes<T, 2>::Tensor Tparams,                            \
+             typename TTypes<Index, 2>::ConstTensor Tindices,                  \
+             typename TTypes<T, 2>::ConstTensor Tupdates,                      \
+             typename TTypes<T, 2>::Tensor Toutput);                           \
+  template Index ScatterNdFunctor<CPUDevice, T, Index, op, CPU_PROVIDED_IXDIM, \
+                                  /*DROP_BAD_INDICES=*/true>::                 \
+  operator()(const CPUDevice& d, const Index slice_size,                       \
+             const Eigen::array<Eigen::DenseIndex, CPU_PROVIDED_IXDIM>         \
+                 output_shape_prefix,                                          \
+             typename TTypes<T, 2>::Tensor Tparams,                            \
+             typename TTypes<Index, 2>::ConstTensor Tindices,                  \
+             typename TTypes<T, 2>::ConstTensor Tupdates,                      \
+             typename TTypes<T, 2>::Tensor Toutput)
 
 #define REGISTER_SCATTER_ND_INDEX(type, op)  \
   REGISTER_SCATTER_ND_FULL(type, int32, op); \

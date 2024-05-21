@@ -124,8 +124,9 @@ __global__ void ScatterNdOpKernel(
 namespace functor {
 
 // Functor used by ScatterOp to do the computations.
-template <typename T, typename Index, scatter_nd_op::UpdateOp op, int IXDIM>
-struct ScatterNdFunctor<GPUDevice, T, Index, op, IXDIM> {
+template <typename T, typename Index, scatter_nd_op::UpdateOp op, int IXDIM,
+          bool DROP_BAD_INDICES>
+struct ScatterNdFunctor<GPUDevice, T, Index, op, IXDIM, DROP_BAD_INDICES> {
   Index operator()(
       const GPUDevice& d, const Index slice_size,
       const Eigen::array<Eigen::DenseIndex, IXDIM> output_shape_prefix,
@@ -164,8 +165,11 @@ struct ScatterNdFunctor<GPUDevice, T, Index, op, IXDIM> {
 
 }  // namespace functor
 
-#define DECLARE_GPU_SPECS_INDEX_OP_IXDIM(T, Index, op, IXDIM) \
-  template struct functor::ScatterNdFunctor<GPUDevice, T, Index, op, IXDIM>;
+#define DECLARE_GPU_SPECS_INDEX_OP_IXDIM(T, Index, op, IXDIM)               \
+  template struct functor::ScatterNdFunctor<GPUDevice, T, Index, op, IXDIM, \
+                                            /*DROP_BAD_INDICES=*/false>;    \
+  template struct functor::ScatterNdFunctor<GPUDevice, T, Index, op, IXDIM, \
+                                            /*DROP_BAD_INDICES=*/true>;
 
 #define DECLARE_GPU_SPECS_INDEX_OP(T, Index, op)     \
   DECLARE_GPU_SPECS_INDEX_OP_IXDIM(T, Index, op, 1); \
