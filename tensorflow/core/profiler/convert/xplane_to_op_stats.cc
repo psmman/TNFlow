@@ -245,7 +245,7 @@ OpStats ConvertXSpaceToOpStats(const XSpace& space,
           has_device ? &step_events : nullptr;
       StepEvents host_step_events =
           ConvertHostThreadsXPlaneToStepEvents(*host_plane, device_step_events);
-      CombineStepEvents(host_step_events, &step_events);
+      if (!has_device) CombineStepEvents(host_step_events, &step_events);
     }
     XPlaneVisitor visitor = tsl::profiler::CreateTfXPlaneVisitor(host_plane);
     auto stat = visitor.GetStat(StatType::kMatrixUnitUtilizationPercent);
